@@ -1,0 +1,266 @@
+---
+title: "326.212 Final Project: Part 3 - Q2"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE, 
+                      message = FALSE, warning = FALSE)
+```
+
+```{r packages, include = FALSE}
+# 추가로 필요한 패키지가 있다면 이곳에 작성하시오.
+library(tidyverse)
+library(MASS)
+library('stringr')
+library('forcats')
+library('lubridate')
+library('modelr')
+library('hms')
+```
+
+## 2019 - 15993 Lee seung heon
+
+```{r, include = FALSE}
+Measurement_info <-read.csv("data/Measurement_info.csv")
+Measurement_item_info <-read.csv("data/Measurement_item_info.csv")
+Measurement_station_info <-read.csv("data/Measurement_station_info.csv")
+```
+
+
+```{r, include = FALSE}
+
+Measurement_relational_info <- Measurement_info %>% 
+  inner_join(Measurement_item_info, by = "Item.code") %>% inner_join(Measurement_station_info, by = "Station.code")
+
+```
+
+
+```{r, include = FALSE}
+level <- c("Good(Blue)", "Normal(Green)", "Bad(Yellow)", "Very bad(Red)")
+Pollution_level <- vector("character", nrow(Measurement_relational_info))
+value<-unlist(Measurement_relational_info[,4])
+t1 <- unlist(Measurement_relational_info[,8])
+t2 <- unlist(Measurement_relational_info[,9])
+t3 <- unlist(Measurement_relational_info[,10])
+t4 <- unlist(Measurement_relational_info[,11])
+  
+for ( i in seq_len(nrow(Measurement_relational_info))) {
+  
+   if (value[[i]]<0) {Pollution_level[i] <- NA}
+  
+   else if (value[[i]]<=t1[[i]]) {Pollution_level[i] <- level[1]}
+     
+   else if (value[[i]]<=t2[[i]]) {Pollution_level[i] <- level[2]}
+  
+   else if (value[[i]]<=t3[[i]]) {Pollution_level[i] <- level[3]}
+  
+   else if (value[[i]]<=t4[[i]]) {Pollution_level[i] <- level[4]}
+   
+   else if (value[[i]]>t4[[i]]) {Pollution_level[i] <- NA}
+  
+}
+pollution_level <- tibble(Pollution_level)
+
+
+Measurement_relational_info <- Measurement_relational_info %>% cbind(pollution_level)
+
+```
+
+```{r, include = FALSE}
+Measurement_relational_info <- Measurement_relational_info %>% dplyr::select(
+-Station.code , -Address, -Latitude, -Longitude, -Item.code, -Unit.of.measurement, -Good.Blue., -Normal.Green., -Bad.Yellow., -Very.bad.Red.)
+
+```
+
+
+```{r, include = FALSE}
+Measurement_relational_info$Measurement.date <- as.factor(Measurement_relational_info$Measurement.date)
+Measurement_relational_info$Item.name <- as.factor(Measurement_relational_info$Item.name)
+Measurement_relational_info$Station.name.district. <- as.factor(Measurement_relational_info$Station.name.district.)
+Measurement_relational_info$Pollution_level <- as.factor(Measurement_relational_info$Pollution_level)
+```
+
+```{r, include = FALSE}
+Measurement_relational_info <- Measurement_relational_info %>% filter(!is.na(Pollution_level))
+```
+
+
+```{r, include = FALSE}
+
+Measurement_relational_info_Q4 <- Measurement_relational_info %>% filter(Instrument.status == 0)
+
+```
+
+## Part 3 - Q2
+
+### Step 1
+
+```{r}
+weather_2017<-read.csv("data/weather2017.csv")
+weather_2018<-read.csv("data/weather2018.csv")
+weather_2019<-read.csv("data/weather2019.csv")
+weather <- rbind(weather_2017,weather_2018,weather_2019) %>% rename(Station_code = 지점, District = 지점명, Measurement_date = 일시, Temper = 기온..C., Direct = 풍향.deg., Speed = 풍속.m.s.
+)
+
+```
+
+```{r}
+weather_2017_j<-read.csv("data/weather2017(Jongno).csv")
+weather_2018_j<-read.csv("data/weather2018(Jongno).csv")
+weather_2019_j<-read.csv("data/weather2019(Jongno).csv")
+weather_j <- rbind(weather_2017_j,weather_2018_j,weather_2019_j) %>% rename(Station_code = 지점, District = 지점명, Measurement_date = 일시, Temper = 기온..C.,Direct = `풍향.16방위.`, Speed = 풍속.m.s.
+)
+
+```
+
+```{r}
+weather_info <- rbind(weather,weather_j) 
+```
+
+```{r}
+code <- read.csv("data/kmacode.csv") %>% rename(Station_code = Station.code)
+data <- left_join(code, weather_info, by = "Station_code")
+weather_data <- data %>% dplyr::select(-Station_code, - District.y) %>% rename(District = District.x)
+
+```
+
+```{r}
+spread_item <- Measurement_relational_info_Q4 %>% dplyr::select(Measurement.date, Station.name.district., Item.name, Average.value) %>% spread(key = Item.name, value = Average.value) %>% rename(District = Station.name.district., Measurement_date = Measurement.date)
+```
+
+```{r}
+joined_data <- inner_join(weather_data, spread_item, by = c("Measurement_date", "District" ))
+```
+
+### Step 2
+
+```{r}
+PM10_direct <- joined_data %>% filter(PM10>150) %>% na.omit() %>%  dplyr::select(Direct)
+PM2.5_direct <- joined_data %>% filter(PM10>75) %>% na.omit() %>%  dplyr::select(Direct)
+```
+
+```{r}
+PM10_direct <- PM10_direct %>% filter(Direct<=360, Direct>0)
+PM2.5_direct <- PM2.5_direct %>% filter(Direct<=360, Direct>0)
+
+```
+
+```{r}
+Direct_level <- c("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+
+ PM10_bearing <- within(PM10_direct, {bearing = character(0) 
+bearing[Direct<=22.5 & Direct>=0.1] = Direct_level[1]
+bearing[Direct<=67.5 & Direct>=22.6] = Direct_level[2]
+bearing[Direct<=112.5 & Direct>=67.6] = Direct_level[3]
+bearing[Direct<=157.5 & Direct>=112.6] = Direct_level[4]
+bearing[Direct<=202.5 & Direct>=157.6] = Direct_level[5]
+bearing[Direct<=247.5 & Direct>=202.6] = Direct_level[6]
+bearing[Direct<=292.5 & Direct>=247.6] = Direct_level[7]
+bearing[Direct<=337.5 & Direct>=292.6] = Direct_level[8]
+bearing[Direct<=360.0 & Direct>=337.6] = Direct_level[1]
+bearing = factor(bearing, level = Direct_level)
+  })
+ 
+ PM2.5_bearing <- within(PM2.5_direct, {bearing = character(0) 
+bearing[Direct<=22.5 & Direct>=0.1] = Direct_level[1]
+bearing[Direct<=67.5 & Direct>=22.6] = Direct_level[2]
+bearing[Direct<=112.5 & Direct>=67.6] = Direct_level[3]
+bearing[Direct<=157.5 & Direct>=112.6] = Direct_level[4]
+bearing[Direct<=202.5 & Direct>=157.6] = Direct_level[5]
+bearing[Direct<=247.5 & Direct>=202.6] = Direct_level[6]
+bearing[Direct<=292.5 & Direct>=247.6] = Direct_level[7]
+bearing[Direct<=337.5 & Direct>=292.6] = Direct_level[8]
+bearing[Direct<=360.0 & Direct>=337.6] = Direct_level[1]
+bearing = factor(bearing, level = Direct_level)
+  })
+ 
+ 
+PM10_bearing <- PM10_bearing %>% transmute(Direct = bearing)
+PM2.5_bearing <- PM2.5_bearing %>% transmute(Direct = bearing)
+
+
+```
+
+```{r}
+PM10_bearing_ratio <- PM10_bearing %>% group_by(Direct) %>% summarise(n()) %>% mutate(ratio = `n()`/sum(`n()`)) %>% dplyr::select(-`n()`) %>% mutate(item = "PM10")
+PM2.5_bearing_ratio <- PM2.5_bearing %>% group_by(Direct) %>% summarise(n()) %>% mutate(ratio = `n()`/sum(`n()`))  %>% dplyr::select(-`n()`) %>% mutate(item = "PM2.5")
+bearing_ratio <- rbind(PM10_bearing_ratio, PM2.5_bearing_ratio)
+bearing_ratio
+```
+
+### [문제1]
+
+```{r}
+ggplot(data = bearing_ratio ) + geom_point(aes(Direct, ratio), size = 2) + coord_polar(start = -pi/8) + geom_polygon(aes(Direct,ratio, group = item, color = item), fill=NA) + theme_light() + labs(x=NULL , y = "Proportion")
+```
+
+### [문제2]
+
+고농도 미세먼지 상황일 때는 풍향이 대부분 서쪽계열임을 확인할 수 있다. 이는 서풍이 부는 것과 미세먼지 농도가 높아지는 것 사이에 관련성이 있음을 암시한다. 즉, 서쪽에서 미세먼지를 실은 바람이 불어온다는 것이다. 남북 방향으로 길게 뻗어 있는 우리나라의 지리적 특성을 고려해보면 미세먼지를 실은 서풍은 국외요인으로 여기는 것이 합당하다. 그리고 우리나라의 서쪽에 위치해있는 중국에 고농도 미세먼지가 발생할 환경이 갖추어 있다는 점을 생각해본다면 중국에서 불어오는 서풍이 고농도 미세먼지 환경을 조성했다고 할 수 있다.     
+
+### [문제3]
+
+위 분석을 계절별로 시행한다면 더 유의미한 결과를 얻을 수 있다. 우리나라에 부는 바람의 방향은 계절마다 조금씩 달라지기 때문에 계절별로 위 분석을 시행한다면 다른 요인을 찾을 수도 있을 것이다. 예를 들어, 겨울에 서풍의 빈도가 적게 나왔다면 겨울에는 서풍 보다도 난방이나 배기가스 배출과 같은 국내요인이  미세먼지 발생의 주원인이 된다고 주장할 수도 있다. 즉, 계절별 분석을 시행하면 계절별로 국내요인이 주요한지 서풍으로 인한 국외요인이 주요한지 구분할 수 있을 것이다. 
+
+### Step 3
+
+### [문제1]
+
+```{r}
+heat_island_data <- joined_data %>% filter(!is.na(Temper), !is.na(PM10), !is.na(PM2.5)) %>% filter(month(Measurement_date)<=2 | month(Measurement_date) == 12 ) %>% filter(hour(Measurement_date)>=3, hour(Measurement_date)<=9)
+```
+
+
+```{r}
+mean_sd <- heat_island_data %>% group_by(Measurement_date) %>% summarise(mean(Temper), mean(PM10), mean(PM2.5), sd(Temper), sd(PM10), sd(PM2.5))
+
+```
+
+```{r}
+std_data <- inner_join(heat_island_data, mean_sd, by = "Measurement_date") %>% mutate(Temper = (Temper - `mean(Temper)`)/`sd(Temper)`, PM10 = (PM10 - `mean(PM10)`)/`sd(PM10)`, PM2.5 = (PM2.5 - `mean(PM2.5)`)/`sd(PM2.5)`)
+
+```
+
+```{r}
+mod1 <- lm(PM10 ~ Temper, data = std_data)
+grid <- std_data %>% data_grid(Temper) %>% add_predictions(mod1)
+ggplot(std_data) + geom_point(aes(Temper, PM10),color ="Red") + geom_line(aes(Temper,y=pred), data = grid)
+summary(mod1)
+cor(std_data$PM10, std_data$Temper)
+```
+
+결정계수는 0.0001893, 상관계수는 -0.01376043이다.
+
+```{r}
+mod2 <- lm(PM2.5 ~ Temper, data = std_data)
+grid <- std_data %>% data_grid(Temper) %>% add_predictions(mod2)
+ggplot(std_data) + geom_point(aes(Temper, PM2.5),color ="Blue") + geom_line(aes(Temper,y=pred), data = grid)
+summary(mod2)
+cor(std_data$PM2.5, std_data$Temper)
+```
+
+결정계수는 0.0001168, 상관계수는  0.01080846이다.
+
+```{r}
+mod3 <- lm(PM10 ~ PM2.5, data = std_data)
+summary(mod3)
+cor(std_data$PM2.5, std_data$PM10)
+```
+PM2.5와 PM10의 상관계수는 0.5381103, 결정계수는 0.2896이다.
+
+### [문제2]
+
+위 결과에서 온도와 미세먼지 사이의 상관계수와 결정계수들을 봤을 때, 이들은 서로 무관하다. 다만 PM2.5와 PM10이 양의 상관관계를 지니고 있다는 것 정도만 설명이 가능하다.    
+
+### [문제3]
+
+현재의 방식으로는 유의미한 결과를 얻어내지 못한다. 기존의 목적인 도심 열섬효과와 미세먼지의 관게를 잘 이해하기 위해서는 다른 방식의 분석을 도입할 필요가 있다. 현재는 시간대 별로 서울시 전체의 평균 온도와 미세먼지 농도를 분석 중이다. 하지만 열섬효과가 대도시에서 건물이나 도로, 공장 등에서 방출되는 복사열로 인해 주변에 비해 온도가 1~3도 가량 높게 나타나는 현상임에 주목할 필요가 있다. 
+
+```{r}
+heat_island_data %>% group_by(District) %>% summarise(mean(Temper)) %>% arrange(desc(`mean(Temper)`))
+```
+
+위 표를 보면 같은 서울 내에서도 자치구에 따라서 평균 온도가 크게는 5도까지도 차이남을 확인할 수 있다. 이는 서울이 자치구에 따라 지역적 환경이 많이 다르기 때문이다. 그러므로 서울의 모든 자치구에서 열섬현상으로인한 더스트 돔이 발생했다고 보기는 힘들다. 따라서 기존의 목적인 도심 열섬효과와 미세먼지의 관게를 잘 이해하기 위해서는 도심 열섬효과가 일어났을 것으로 추정되는 자치구를 선택하여 분석할 필요가 있다. 실제로 지정한 시간대에서 평균 기온이 높은 상위 몇개의 자치구에서 분석을 시행해보면 유의미한 결과를 얻을 수 있을 것으로 추정된다. 
+
+

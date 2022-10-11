@@ -1,0 +1,80 @@
+---
+title: "326.212 Final Project: Part 1"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE, 
+                      message = FALSE, warning = FALSE)
+```
+
+```{r packages, include = FALSE}
+# 추가로 필요한 패키지가 있다면 이곳에 작성하시오.
+library('tidyverse')
+library('stringr')
+library('forcats')
+library('lubridate')
+library('modelr')
+library('hms')
+```
+
+## 2019 - 15993 Lee seung heon
+
+## Part 1
+
+### Q1
+
+```{r}
+# 진행하였음.
+```
+
+### Q2
+
+```{r}
+Measurement_info <-read.csv("data/Measurement_info.csv")
+Measurement_item_info <-read.csv("data/Measurement_item_info.csv")
+Measurement_station_info <-read.csv("data/Measurement_station_info.csv")
+```
+
+### Q3
+
+```{r}
+
+Measurement_relational_info <- Measurement_info %>% 
+  inner_join(Measurement_item_info, by = "Item.code") %>% inner_join(Measurement_station_info, by = "Station.code")
+
+```
+
+### Q4
+
+```{r}
+level <- c("Good(Blue)", "Normal(Green)", "Bad(Yellow)", "Very bad(Red)")
+Pollution_level <- vector("character", nrow(Measurement_relational_info))
+value<-unlist(Measurement_relational_info[,4])
+t1 <- unlist(Measurement_relational_info[,8])
+t2 <- unlist(Measurement_relational_info[,9])
+t3 <- unlist(Measurement_relational_info[,10])
+t4 <- unlist(Measurement_relational_info[,11])
+  
+for ( i in seq_len(nrow(Measurement_relational_info))) {
+  
+   if (value[[i]]<0) {Pollution_level[i] <- NA}
+  
+   else if (value[[i]]<=t1[[i]]) {Pollution_level[i] <- level[1]}
+     
+   else if (value[[i]]<=t2[[i]]) {Pollution_level[i] <- level[2]}
+  
+   else if (value[[i]]<=t3[[i]]) {Pollution_level[i] <- level[3]}
+  
+   else if (value[[i]]<=t4[[i]]) {Pollution_level[i] <- level[4]}
+   
+   else if (value[[i]]>t4[[i]]) {Pollution_level[i] <- NA}
+  
+}
+pollution_level <- tibble(Pollution_level)
+
+
+Measurement_relational_info <- Measurement_relational_info %>% cbind(pollution_level)
+
+```
+

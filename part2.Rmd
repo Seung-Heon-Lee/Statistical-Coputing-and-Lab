@@ -1,0 +1,253 @@
+---
+title: "326.212 Final Project: Part 2"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE, 
+                      message = FALSE, warning = FALSE)
+```
+
+```{r packages, include = FALSE}
+# 추가로 필요한 패키지가 있다면 이곳에 작성하시오.
+library('tidyverse')
+library('forcats')
+library('lubridate')
+library(corrplot)
+
+```
+
+## 2019 - 15993 Lee seung heon
+
+
+```{r, include = FALSE}
+Measurement_info <-read.csv("data/Measurement_info.csv")
+Measurement_item_info <-read.csv("data/Measurement_item_info.csv")
+Measurement_station_info <-read.csv("data/Measurement_station_info.csv")
+```
+
+
+```{r, include = FALSE}
+
+Measurement_relational_info <- Measurement_info %>% 
+  inner_join(Measurement_item_info, by = "Item.code") %>% inner_join(Measurement_station_info, by = "Station.code")
+
+```
+
+
+```{r, include = FALSE}
+level <- c("Good(Blue)", "Normal(Green)", "Bad(Yellow)", "Very bad(Red)")
+Pollution_level <- vector("character", nrow(Measurement_relational_info))
+value<-unlist(Measurement_relational_info[,4])
+t1 <- unlist(Measurement_relational_info[,8])
+t2 <- unlist(Measurement_relational_info[,9])
+t3 <- unlist(Measurement_relational_info[,10])
+t4 <- unlist(Measurement_relational_info[,11])
+  
+for ( i in seq_len(nrow(Measurement_relational_info))) {
+  
+   if (value[[i]]<0) {Pollution_level[i] <- NA}
+  
+   else if (value[[i]]<=t1[[i]]) {Pollution_level[i] <- level[1]}
+     
+   else if (value[[i]]<=t2[[i]]) {Pollution_level[i] <- level[2]}
+  
+   else if (value[[i]]<=t3[[i]]) {Pollution_level[i] <- level[3]}
+  
+   else if (value[[i]]<=t4[[i]]) {Pollution_level[i] <- level[4]}
+   
+   else if (value[[i]]>t4[[i]]) {Pollution_level[i] <- NA}
+  
+}
+pollution_level <- tibble(Pollution_level)
+
+
+Measurement_relational_info <- Measurement_relational_info %>% cbind(pollution_level)
+
+```
+
+## Part 2
+
+### Q1
+
+```{r}
+Measurement_relational_info <- Measurement_relational_info %>% select(
+-Station.code , -Address, -Latitude, -Longitude, -Item.code, -Unit.of.measurement, -Good.Blue., -Normal.Green., -Bad.Yellow., -Very.bad.Red.)
+
+```
+
+### Q2
+
+```{r}
+Measurement_relational_info$Measurement.date <- as.factor(Measurement_relational_info$Measurement.date)
+Measurement_relational_info$Item.name <- as.factor(Measurement_relational_info$Item.name)
+Measurement_relational_info$Station.name.district. <- as.factor(Measurement_relational_info$Station.name.district.)
+Measurement_relational_info$Pollution_level <- as.factor(Measurement_relational_info$Pollution_level)
+```
+
+### Q3
+
+#### 1.
+
+```{r}
+
+colSums(is.na(Measurement_relational_info))
+
+```
+각 변수별 NA의 개수는 위 결과와 같다. 
+
+#### 2.
+
+Pollution_level 변수에서 나온 결측치들은 Average.value가 음수이거나 임계치를 초과한 경우이다. 
+
+#### 3.
+
+측정되어서는 안되는 값이 측정된 경우이므로 해당 데이터를 그냥 삭제하는 방식으로 처리하면 된다.
+
+```{r}
+Measurement_relational_info <- Measurement_relational_info %>% filter(!is.na(Pollution_level))
+```
+
+### Q4
+
+#### 1.
+
+```{r}
+Instrument_ratio <- Measurement_relational_info %>% group_by(Instrument.status) %>% count() 
+
+Instrument_ratio %>% mutate(total = sum(Instrument_ratio$n), ratio = n/total)
+```
+
+#### 2.
+
+Instrument status는 0: Normal, 1: Need for calibration, 2: Abnormal, 4: Power cut off, 8: Under repair, 9: abnormal data 이고 대략 98퍼센트의 측정치가 0에 속한다. 따라서 측정장치의 상태가 불량하여 신뢰할만한 측정치를 얻지 못한 것들을 고려하지 않고, Instrument status가 0인 행들만 다루는 것이 데이터를 분석하는 데에 더 좋다.
+
+```{r}
+
+Measurement_relational_info <- Measurement_relational_info %>% filter(Instrument.status == 0)
+```
+
+### Q5
+
+```{r}
+arranged_info <- Measurement_relational_info %>% arrange(Item.name, desc(Average.value))
+
+rbind(arranged_info %>% filter(Item.name == 'PM10') %>% head(1),
+      arranged_info %>% filter(Item.name == 'PM2.5') %>% head(1),
+      arranged_info %>% filter(Item.name == 'SO2') %>% head(1),
+      arranged_info %>% filter(Item.name == 'NO2') %>% head(1),
+      arranged_info %>% filter(Item.name == 'CO') %>% head(1), 
+      arranged_info %>% filter(Item.name == 'O3') %>% head(1))
+```
+
+### Q6
+
+```{r}
+ggplot(data = Measurement_relational_info ) + 
+   geom_bar(mapping = aes(x = Item.name, fill = Pollution_level), position = "fill", width = 0.7) +
+   labs(title = "Levels of pollution in Seoul 2017 to 2019", x = "Item name", y = "proportion") 
+   
+```
+
+### Q7
+
+```{r}
+head(Measurement_relational_info)
+```
+
+### Q8
+
+```{r}
+Measurement_relational_info %>% filter(Item.name == "PM2.5") %>% group_by(Station.name.district.) %>% summarise(mean(Average.value)) %>% arrange(`mean(Average.value)`)
+```
+
+위 결과를 보면 3 년간 초미세먼지(PM2.5) 평균 배출량이 가장 낮은 구는 강북구이고, 가장 높은 구는 관악구이다.
+
+### Q9
+
+```{r}
+x<-Measurement_relational_info %>% filter(Item.name == "PM2.5") %>% filter(Station.name.district.=="Gwanak-gu")  
+y<-Measurement_relational_info %>% filter(Item.name == "PM2.5") %>% filter(Station.name.district.=="Gangbuk-gu")
+t.test(x$Average.value, y$Average.value)
+```
+
+p-vlaue가 2.2e-16보다 작으므로 유의수준 0.05에서 두 개의 구의 초미세먼지 평균 배출량의 차이는 유의하다.
+
+### Q10
+
+```{r}
+Year <- Measurement_relational_info$Measurement.date %>% year()
+Month <-Measurement_relational_info$Measurement.date %>% month()
+Day <- Measurement_relational_info$Measurement.date %>% day()
+Hour <- Measurement_relational_info$Measurement.date %>% hour()
+```
+```{r}
+Year <- tibble(Year)
+Month <- tibble(Month)
+Day <- tibble(Day)
+Hour <- tibble(Hour)
+Measurement_relational_info <- cbind(Year, Month, Day, Hour, Measurement_relational_info)
+
+```
+
+### Q11
+
+```{r}
+monthly_PM <- Measurement_relational_info %>% filter(Item.name == "PM10" | Item.name == "PM2.5") %>% group_by(Month, Item.name) %>% summarise(mean(Average.value))
+ggplot(data = monthly_PM) + geom_line(aes(Month,`mean(Average.value)`, color = Item.name), show.legend = T)
+```
+
+두 그래프를 봤을 때 PM10과 PM2.5는 비슷한 양상을 보임을 알 수 있다. 둘 다 3월에 가장 많다가 5월에 증가하는 것 말고는 8월경까지 감소하고, 다시 1월까지 증가하다가 2월에 살짝 감소 후 3월에 다시 피크를 찍는 경향을 확인할 수 있다. 1, 3, 5월이 다른 달 들에 비해서 수치가 높은 것을 공통적으로 확인 할 수 있다.  
+
+
+### Q12
+
+#### 1.
+
+```{r}
+spread_item <- Measurement_relational_info %>% select(Measurement.date, Station.name.district., Item.name, Average.value) %>% spread(key = Item.name, value = Average.value) %>% select(-Measurement.date, -Station.name.district.)
+head(spread_item)
+```
+
+#### 1.
+
+```{r}
+spread_item<-spread_item %>% na.omit()
+colSums(is.na(spread_item))
+```
+
+#### 2. 
+
+```{r}
+cor(spread_item)
+```
+
+#### 3. 
+
+```{r}
+corrplot(cor(spread_item))
+```
+
+
+양의 상관관계 : (CO, PM10), (CO, PM2.5), (CO, NO2), (NO2, PM10), (NO2,PM2.5), (PM10, PM2.5)
+
+약한 양의 상관관계 : (CO, SO2), (NO2, SO2), (PM10, SO2), (PM2.5, SO2)
+
+음의 상관관계: (NO2, O3)
+
+약한 음의 상관관계: (O3, CO)
+#### 4.
+
+```{r}
+monthly <- Measurement_relational_info %>% filter(Item.name == "NO2" | Item.name == "O3") %>% group_by(Month, Item.name) %>% summarise(mean(Average.value)) 
+
+ggplot(data = monthly) + geom_line(aes(Month, `mean(Average.value)`, color=Item.name),show.legend = T)
+                                   
+```
+
+```{r}
+hourly <- Measurement_relational_info %>% filter(Item.name == "NO2" | Item.name == "O3") %>% group_by(Hour, Item.name) %>% summarise(mean(Average.value)) 
+
+ggplot(data = hourly) + geom_line(aes(Hour, `mean(Average.value)`, color=Item.name),show.legend = T)
+```
+
